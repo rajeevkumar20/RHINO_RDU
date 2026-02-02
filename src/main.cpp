@@ -12,7 +12,8 @@
 #include <DMD32.h>
 
 #include "Fonts/Logo.h"
-#include "Fonts/Arial_black_16.h"
+// #include "Fonts/Arial_black_16.h"
+#include "Fonts/Droid_Sans_24.h"
 #include "Fonts/CngFont.h"
 #include "Fonts/DieselFont.h"
 #include "Fonts/LpgFont.h"
@@ -31,8 +32,8 @@
 #define LED_PIN       14
 #define BUTTON_PIN    34
 
-const char* ssid     = "RhinoDisplay";
-const char* password = "RhinoWiFi";
+const char* ssid     = "HisignDisplay02";
+const char* password = "HisignWiFi";
 
 IPAddress ip (192, 168, 1, 1);
 IPAddress netmask (255, 255, 255, 0);
@@ -155,7 +156,7 @@ void PrintNumberOnScreen(const char* number) {
   int x = 48;
 
   // Spaces
-  while(*number == '0' && number != NULL) {
+  while(*number == '0' && *(number + 1) != '.' && number != NULL) {
     for(int i=0;i<9;i++) {
       for(int j=0;j<32;j++){
         Screen.writePixel(x + i, j, GRAPHICS_NORMAL, false);
@@ -337,7 +338,7 @@ void HandleSetPrices() {
   UpdatePointers();
 
   if(HaveMessage) {
-    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
   } else {
     PrintStringOnScreen(EnglishFont);
     PrintNumberOnScreen(Price.c_str());
@@ -441,7 +442,7 @@ void HandleSetPduId() {
   UpdatePointers();
 
   if(HaveMessage) {
-    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
   } else {
     PrintStringOnScreen(EnglishFont);
     PrintNumberOnScreen(Price.c_str());
@@ -466,12 +467,12 @@ void WebTask(void *pv) {
   Server.begin();
 
   // Initialise delay
-  vTaskDelay(3000);
+  vTaskDelay(5000);
   
   // Update Font and price
   Screen.clearScreen(true);
   if(HaveMessage) {
-    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+    Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
   } else {
     PrintStringOnScreen(EnglishFont);
     PrintNumberOnScreen(Price.c_str());
@@ -509,7 +510,7 @@ void WebTask(void *pv) {
           UpdatePointers();
 
           if(HaveMessage) {
-            Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+            Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
           } else {
             PrintStringOnScreen(EnglishFont);
             PrintNumberOnScreen(Price.c_str());
@@ -534,13 +535,13 @@ void WebTask(void *pv) {
       if(ScrollEnabled & ledCounter % 3 == 0) {
         if(Screen.stepMarquee(-1,0)) {
           Screen.clearScreen(true);
-          Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+          Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
         }
       }
     } else {
       if(ledCounter % 500 == 0) {
         Screen.clearScreen(true);
-        if(ledCounter > 1000) {
+        if(ledCounter % 1000 == 0) {
           ledCounter = 0;
           PrintStringOnScreen(EnglishFont);
         } else {
@@ -557,9 +558,9 @@ void DmdTask(void *pv) {
   // Clear the DMD pixels held in RAM
   Screen.setBrightness(GetBrightnessFromHour(Rtc.getHours()));
   Screen.clearScreen( true );
-  Screen.selectFont(Arial_Black_16);
+  Screen.selectFont(Droid_Sans_24);
 
-  // Print Logo for 3 seconds
+  // Print Logo for 5 seconds
   PrintLogoOnScreen(Logo);
 
   while(true) {
@@ -599,7 +600,7 @@ void Rs485Task(void *pv) {
           UpdatePointers();
 
           if(HaveMessage) {
-            Screen.drawMarquee(Message.c_str(), Message.length(), 0, 8);
+            Screen.drawMarquee(Message.c_str(), Message.length(), 0, 6);
           } else {
             PrintStringOnScreen(EnglishFont);
             PrintNumberOnScreen(Price.c_str());

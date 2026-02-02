@@ -11,10 +11,10 @@ ESP32-WROOM-32E MCU based display controller. It has the following components:
 
 # How does it work?
 * First, Power up the Unit.
-* Display shows Logo on screen for 3 seconds.
+* Display shows Logo on screen for 5 seconds.
 * After that Display shows stored Price in English & Hindi on the behalf of PDUID.
 * If memory has message, then Display scrolls the message only.
-* User can Connect the Wifi of Unit with the name of "RhinoDisplay" and the password is "RhinoWiFi". 
+* User can Connect the Wifi of Unit with the name of "HisignDisplay" and the password is "HisignWiFi". 
 * User can search "192.168.1.1" on his/her browser.
 * User will see the page from where user can see and update PDUID, Message and prices.
 * User can go to setting by clicking on "Settings" button.
