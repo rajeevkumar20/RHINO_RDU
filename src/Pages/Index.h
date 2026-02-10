@@ -34,7 +34,7 @@ const static char IndexHtml[] PROGMEM =
 "<label>Power99</label><input type=\"number\" id=\"power99\" step=\".01\" min=\"0\" max=\"199.99\" value=\"0.00\">"
 "<label>CNG</label><input type=\"number\" id=\"cng\" step=\".01\" min=\"0\" max=\"199.99\" value=\"0.00\">"
 "<label>Power95</label><input type=\"number\" id=\"power95\" step=\".01\" min=\"0\" max=\"199.99\" value=\"0.00\">"
-"<label>Message</label><input type=\"text\" id=\"msg\" placeholder=\"Write message here\" maxlength=\"50\">"
+"<label>Message</label><input type=\"text\" id=\"msg\" placeholder=\"Write message here\" maxlength=\"500\">"
 "<button class=\"secondary\" type=\"button\" onclick=\"formToUpdate()\">Update</button>"
 "<button class=\"secondary\" type=\"button\" onclick=\"goToAdvSet()\">Settings</button>"
 "</div>"
@@ -80,13 +80,13 @@ const static char IndexHtml[] PROGMEM =
 "return s;}"
 
 "function dateBuilder(){var d=new Date();"
+"const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];"
 "var dd=('0'+d.getDate()).slice(-2);"
-"var mm=('0'+(d.getMonth()+1)).slice(-2);"
-"return dd+'/'+mm+'/'+d.getFullYear();}"
+"return months[d.getMonth()]+' '+dd+' '+d.getFullYear();}"
 
 "function timeBuilder(){var t=new Date();"
-"return ('0'+t.getHours()).slice(-2)+'-'"
-"+('0'+t.getMinutes()).slice(-2)+'-'"
+"return ('0'+t.getHours()).slice(-2)+':'"
+"+('0'+t.getMinutes()).slice(-2)+':'"
 "+('0'+t.getSeconds()).slice(-2);}"
 
 "function goToAdvSet(){window.location='setting_login_page';}"
