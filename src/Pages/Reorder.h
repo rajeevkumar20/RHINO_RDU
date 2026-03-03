@@ -1,0 +1,41 @@
+#ifndef REORDER_SETTING_H
+#define REORDER_SETTING_H
+
+const static char ReorderHtml[] PROGMEM = 
+"<!DOCTYPE html><html><head><title>Reorder Parameters</title><style>"
+"body{font-family:Arial,sans-serif;background-color:aliceblue;margin:0;padding:20px}"
+".container{max-width:420px;margin:40px auto;background:#f8f8f8;padding:22px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.5);color:#fff}"
+".logo{text-align:center;margin-bottom:15px}"
+".logo img{max-width:160px}"
+"h2{text-align:center;margin-bottom:20px;font-weight:600;color:#0b0b0b}"
+"ul{list-style:none;padding:0}"
+"li{padding:12px;margin:8px 0;background-color:#fff;border:1px solid #2a2a2a;border-radius:8px;cursor:move;font-weight:600;color:#000}"
+"li.dragging{opacity:.5}"
+"button{width:100%;margin-top:15px;padding:11px;background:linear-gradient(135deg,#3a3db8,#7a3cff);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:transform .1s ease,box-shadow .1s ease}"
+"button.secondary{background:linear-gradient(135deg,#5b2aa8,#8f3ddb)}"
+"button:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(122,60,255,.4)}"
+"</style></head><body onload=\"getOrder()\"><div class=\"container\">"
+"<div class=\"logo\"><img src=\"icon.png\" alt=\"App Logo\"></div>"
+"<h2>Reorder Parameters</h2><ul id=\"paramList\"></ul>"
+"<button class=\"secondary\" type=\"button\" onclick=\"updateOrder()\">Update Order</button>"
+"</div><script>"
+"const list=document.getElementById(\"paramList\");"
+"async function getOrder(){const res=await fetch(\"http://192.168.1.1/get_order\");"
+"const params=await res.json();list.innerHTML=\"\";"
+"params.forEach(param=>{const li=document.createElement(\"li\");"
+"li.textContent=param;li.draggable=true;list.appendChild(li)});addDragEvents()}"
+"function addDragEvents(){let draggedItem=null;"
+"list.querySelectorAll(\"li\").forEach(item=>{"
+"item.addEventListener(\"dragstart\",()=>{draggedItem=item;item.classList.add(\"dragging\")});"
+"item.addEventListener(\"dragend\",()=>{item.classList.remove(\"dragging\")});"
+"item.addEventListener(\"dragover\",e=>{e.preventDefault()});"
+"item.addEventListener(\"drop\",()=>{list.insertBefore(draggedItem,item)})})}"
+"async function updateOrder(){const params=[...list.querySelectorAll(\"li\")]"
+".map(li=>li.textContent);const jsonObject={PARAM:params};"
+"const jsonData=JSON.stringify(jsonObject,null,2);"
+"await fetch(\"http://192.168.1.1/set_order\",{method:\"POST\","
+"headers:{\"Content-Type\":\"application/json\"},body:jsonData});"
+"alert(\"Order Updated Successfully!\")}"
+"</script></body></html>";
+
+#endif

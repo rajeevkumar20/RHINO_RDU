@@ -26,11 +26,14 @@
 #include "Pages/Index.h"
 #include "Pages/Login.h"
 #include "Pages/Setting.h"
+#include "Pages/Reorder.h"
 #include "Pages/Icon.h"
 
 // #if !defined(DEBUG)
 // #define DEBUG
 // #endif
+
+// #define DEFAULT_CONFIG
 
 #define LED_PIN       14
 #define BUTTON_PIN    34
@@ -56,7 +59,8 @@ typedef struct {
 } ParameterStruct;
 
 typedef enum {
-  DisplaySize960mm = 0,
+  DisplaySize640mm = 0,
+  DisplaySize960mm,
   DisplaySize1600mm,
 } DisplaySizes;
 
@@ -68,6 +72,7 @@ JsonDocument GlobalVariable;
 bool LoggedIn = false;
 uint8_t PduId = 1;
 uint8_t TotalParametersToDisplay = 1;
+uint8_t MsgId = 1;
 ParameterStruct Parameters[8] = {0};
 uint8_t CurrentItemIndex = 0;
 String Message;
@@ -97,9 +102,9 @@ void Rs485Send(const char *data, uint16_t len) {
 // Get brightness % by passing hour
 uint8_t GetBrightnessFromHour(uint8_t hour) {
   if(hour >= 6 && hour < 18) {
-    return 255;  // Day
+    return 240;  // Day 90%
   } 
-  return 225;    // Night
+  return 200;    // Night 70%
 }
 
 // Write data to internal EEPROM
@@ -145,20 +150,32 @@ bool ReadDataFromEeprom(String &dataOut) {
 
 // Print logo on screen
 void PrintLogoOnScreen(const uint8_t *str) {
+  // Not fit for 640mm display
+  if(DisplaySize == DisplaySizes::DisplaySize640mm) {
+    return;
+  }
+
+  int x = (DisplaySize == DisplaySizes::DisplaySize1600mm) ? 32 : 0;
   for(int i=0;i<96;i++) {
     uint32_t y1 = (str[4*i + 3] << 24) | (str[4*i + 2] << 16) | (str[4*i + 1] << 8) | str[4*i];
     for(int j=0;j<32;j++){
-      Screen->writePixel(i, j, GRAPHICS_NORMAL, (y1 >> j) & 1);
+      Screen->writePixel(x + i, j, GRAPHICS_NORMAL, (y1 >> j) & 1);
     }
   }
 }
 
 // Print String on Screen
 void PrintStringOnScreen(const uint8_t *str) {
+  // On 640mm display, string will not present
+  if(DisplaySize == DisplaySizes::DisplaySize640mm) {
+    return;
+  }
+
+  int x = (DisplaySize == DisplaySizes::DisplaySize1600mm) ? 32 : 0;
   for(int i=0;i<48;i++) {
     uint32_t y1 = (str[4*i + 3] << 24) | (str[4*i + 2] << 16) | (str[4*i + 1] << 8) | str[4*i];
     for(int j=0;j<32;j++){
-      Screen->writePixel(i, j, GRAPHICS_NORMAL, (y1 >> j) & 1);
+      Screen->writePixel(x + i, j, GRAPHICS_NORMAL, (y1 >> j) & 1);
     }
   }
 }
@@ -166,7 +183,14 @@ void PrintStringOnScreen(const uint8_t *str) {
 // Print Numbers on Screen
 void PrintNumberOnScreen(const char* number) {
   int len = strlen(number);
-  int x = (DisplaySize == DisplaySizes::DisplaySize1600mm) ? 80 : 48;
+  int x = 48;
+  if(DisplaySize == DisplaySizes::DisplaySize1600mm) {
+    x = 80;
+  } else if(DisplaySize == DisplaySizes::DisplaySize960mm) {
+    x = 48;
+  } else {
+    x = 0;
+  }
 
   // Spaces
   while(*number == '0' && *(number + 1) != '.' && number != NULL) {
@@ -227,53 +251,46 @@ void PrintNumberOnScreen(const char* number) {
 // Get Item details
 ParameterStruct GetItemDetail(String& item) {
   ParameterStruct param;
-  if(item == "item1") {
+  String price = GlobalVariable[item];
+  if(item == "Petrol") {
     // Petrol
     param.EnglishFont = PetrolEnglish;
     param.HindiFont = PetrolHindi;
-    String price = GlobalVariable["item1"];
     param.Value = price;
-  } else if(item == "item2") {
+  } else if(item == "Diesel") {
     // Diesel
     param.EnglishFont = DieselEnglish;
     param.HindiFont = DieselHindi;
-    String price = GlobalVariable["item2"];
     param.Value = price;
-  } else if(item == "item3") {
+  } else if(item == "Power") {
     // poWer
     param.EnglishFont = PowerEnglish;
     param.HindiFont = PowerHindi;
-    String price = GlobalVariable["item3"];
     param.Value = price;
-  } else if(item == "item4") {
+  } else if(item == "Auto LPG") {
     // Auto LPG
     param.EnglishFont = LpgEnglish;
     param.HindiFont = LpgHindi;
-    String price = GlobalVariable["item4"];
     param.Value = price;
-  } else if(item == "item5") {
+  } else if(item == "TurboJet") {
     // TurboJet
     param.EnglishFont = TurboEnglish;
     param.HindiFont = TurboHindi;
-    String price = GlobalVariable["item5"];
     param.Value = price;
-  } else if(item == "item6") {
+  } else if(item == "Power99") {
     // poWer99
     param.EnglishFont = Power99English;
-    param.HindiFont = Power99English;
-    String price = GlobalVariable["item6"];
+    param.HindiFont = Power99Hindi;
     param.Value = price;
-  } else if(item == "item7") {
+  } else if(item == "CNG") {
     // CNG
     param.EnglishFont = CngEnglish;
     param.HindiFont = CngHindi;
-    String price = GlobalVariable["item7"];
     param.Value = price;
-  } else if(item == "item8") {
+  } else if(item == "Power95") {
     // poWer95
     param.EnglishFont = Power95English;
-    param.HindiFont = Power95English;
-    String price = GlobalVariable["item8"];
+    param.HindiFont = Power95Hindi;
     param.Value = price;
   }
 
@@ -329,17 +346,29 @@ bool UpdatePointers() {
   String displaySize = GlobalVariable["SIZE"];
   if(displaySize == "1600mm") {
     DisplaySize = DisplaySizes::DisplaySize1600mm;
-  } else {
+  } else if(displaySize == "960mm") {
     DisplaySize = DisplaySizes::DisplaySize960mm;
+  } else {
+    DisplaySize = DisplaySizes::DisplaySize640mm;
   }
 
   // PDU ID
   String pduId = GlobalVariable["PDUID"];
   PduId = pduId.toInt();
-
+  
   // Parameter Counts
   String paramCounts = GlobalVariable["CNTS"];
   TotalParametersToDisplay = paramCounts.toInt();
+  if(PduId + TotalParametersToDisplay > 9) {
+    TotalParametersToDisplay = 9 - PduId;
+    // char str[4] = {0};
+    // sprintf(str, "%02d", TotalParametersToDisplay);
+    // GlobalVariable["CNTS"] = String(str);
+  }
+
+  // Message ID
+  String msgId = GlobalVariable["MSGID"];
+  MsgId = msgId.toInt();
 
   #if defined(DEBUG)
   Serial.printf("PDU ID: %d\nCNTS: %d\n", PduId, TotalParametersToDisplay);
@@ -347,13 +376,16 @@ bool UpdatePointers() {
   
   // 1 <= PDUID >= 8 
   // 1 <= CNTS  >= 4 
-  if(!(PduId > 0 && PduId < 9) || !(TotalParametersToDisplay > 0 && TotalParametersToDisplay < 5)) {
+  // 1 <= MSGID >= 8 
+  if(!(PduId > 0 && PduId < 9) || 
+      !(TotalParametersToDisplay > 0 && TotalParametersToDisplay < 5) || 
+      !(MsgId > 0 && MsgId < 9)) {
     return false;
   }
 
   // Message
   String msg = GlobalVariable["MSG"];
-  if(!msg.isEmpty() && msg != "null" && pduId == "01") {
+  if(!msg.isEmpty() && msg != "null" && pduId == msgId) {
     Message = msg;
     Message.toUpperCase();
     HaveMessage = true;
@@ -366,17 +398,29 @@ bool UpdatePointers() {
 
     if(DisplaySize == DisplaySizes::DisplaySize1600mm) {
       ScrollEnabled = (messagewidth > 159);
-    } else {
+    } if(DisplaySize == DisplaySizes::DisplaySize960mm) {
       ScrollEnabled = (messagewidth > 95);
+    } else {
+      ScrollEnabled = (messagewidth > 31);
     }
     return true;
   }
 
   // Items
   HaveMessage = false;
+  JsonArray params = GlobalVariable["PARAM"];
+  int startIndex = (PduId - 1) * TotalParametersToDisplay;
+  if(!msg.isEmpty() && msg != "null" && pduId > msgId) {
+    // If message exist but message id 
+    startIndex = startIndex - TotalParametersToDisplay;
+  }
+
   for(uint8_t i = 0;i<TotalParametersToDisplay;i++) {
-    String item = "item" + String(i + PduId);
+    String item = params[startIndex + i];
     Parameters[i] = GetItemDetail(item);
+    #if defined(DEBUG)
+    Serial.println(item);
+    #endif
   }
 
   return true;
@@ -396,8 +440,10 @@ void Show() {
     if(ScrollEnabled) {
       if(DisplaySize == DisplaySizes::DisplaySize1600mm) {
         Screen->drawMarquee(Message.c_str(), Message.length(), 159, 6);
-      } else {
+      } if(DisplaySize == DisplaySizes::DisplaySize960mm) {
         Screen->drawMarquee(Message.c_str(), Message.length(), 95, 6);
+      } else {
+        Screen->drawMarquee(Message.c_str(), Message.length(), 31, 6);
       }
     } else {
       Screen->drawMarquee(Message.c_str(), Message.length(), 0, 6);
@@ -406,6 +452,26 @@ void Show() {
     PrintStringOnScreen(Parameters[0].EnglishFont);
     PrintNumberOnScreen(Parameters[0].Value.c_str());
   }
+}
+
+// Sync Data & Settings
+void SyncDataAndSettings(bool sendToAll) {
+  // Save to EEPROM
+  String jsonString;
+  serializeJson(GlobalVariable, jsonString);
+  if(!WriteDataToEeprom(jsonString)) {
+    #if defined(DEBUG)
+    Serial.println("EEPROM Write Failed");
+    #endif
+  }
+  
+  if(sendToAll)  {
+    // Send to all
+    Rs485Send(jsonString.c_str(), jsonString.length());
+    Rs485Send("\r\n", 2);
+  }
+
+  IsValid = UpdatePointers();
 }
 
 // http://192.168.1.1/
@@ -434,14 +500,14 @@ void HandleSetPrices() {
   deserializeJson(json, body);
 
   // Update Values
-  GlobalVariable["item1"] = json["item1"];
-  GlobalVariable["item2"] = json["item2"];
-  GlobalVariable["item3"] = json["item3"];
-  GlobalVariable["item4"] = json["item4"];
-  GlobalVariable["item5"] = json["item5"];
-  GlobalVariable["item6"] = json["item6"];
-  GlobalVariable["item7"] = json["item7"];
-  GlobalVariable["item8"] = json["item8"];
+  GlobalVariable["Petrol"] = json["Petrol"];
+  GlobalVariable["Diesel"] = json["Diesel"];
+  GlobalVariable["Power"] = json["Power"];
+  GlobalVariable["Auto_LPG"] = json["Auto_LPG"];
+  GlobalVariable["TurboJet"] = json["TurboJet"];
+  GlobalVariable["Power99"] = json["Power99"];
+  GlobalVariable["CNG"] = json["CNG"];
+  GlobalVariable["Power95"] = json["Power95"];
   GlobalVariable["MSG"] = json["MSG"];
   
   String dateString = json["date"];
@@ -460,21 +526,7 @@ void HandleSetPrices() {
 
   Server.send(200, "application/json", "{\"status\":\"UPDATED SUCCESSFULLY\"}");
 
-  // Save to EEPROM
-  String jsonString;
-  serializeJson(GlobalVariable, jsonString);
-  if(!WriteDataToEeprom(jsonString)) {
-    #if defined(DEBUG)
-    Serial.println("EEPROM Write Failed");
-    #endif
-  }
-  
-  // Send to all
-  serializeJson(json, jsonString);
-  Rs485Send(jsonString.c_str(), jsonString.length());
-  Rs485Send("\r\n", 2);
-
-  IsValid = UpdatePointers();
+  SyncDataAndSettings(true);
   Show();
 }
 
@@ -484,14 +536,14 @@ void HandleGetPrices() {
 
   JsonDocument json;
   json["PDUID"] = GlobalVariable["PDUID"];
-  json["item1"] = GlobalVariable["item1"];
-  json["item2"] = GlobalVariable["item2"];
-  json["item3"] = GlobalVariable["item3"];
-  json["item4"] = GlobalVariable["item4"];
-  json["item5"] = GlobalVariable["item5"];
-  json["item6"] = GlobalVariable["item6"];
-  json["item7"] = GlobalVariable["item7"];
-  json["item8"] = GlobalVariable["item8"];
+  json["Petrol"] = GlobalVariable["Petrol"];
+  json["Diesel"] = GlobalVariable["Diesel"];
+  json["Power"] = GlobalVariable["Power"];
+  json["Auto_LPG"] = GlobalVariable["Auto_LPG"];
+  json["TurboJet"] = GlobalVariable["TurboJet"];
+  json["Power99"] = GlobalVariable["Power99"];
+  json["CNG"] = GlobalVariable["CNG"];
+  json["Power95"] = GlobalVariable["Power95"];
   json["MSG"] = GlobalVariable["MSG"];
 
   String temp;
@@ -533,6 +585,16 @@ void HandleSettingPage() {
   Server.send(200, "text/html", SettingHtml); 
 }
 
+// http://192.168.1.1/reorder_parameters
+void HandleReorderParamPage() {
+  if(!LoggedIn) {
+    Server.send(401, "text/html", "Unauthorized"); 
+    return;
+  }
+
+  Server.send(200, "text/html", ReorderHtml);
+}
+
 // http://192.168.1.1/get_settings
 void HandleGetSettings() {
   if(!LoggedIn) {
@@ -548,6 +610,27 @@ void HandleGetSettings() {
   String pswd = GlobalVariable["PSWD"];
   String pduId = "{\"PDUID\":\"" + id + "\",\"CNTS\":\"" + cnt + "\",\"SIZE\":\"" + sze + "\",\"SSID\":\"" + ssid + "\",\"USER\":\"" + user + "\",\"PSWD\":\"" + pswd + "\"}";
   Server.send(200, "application/json", pduId); 
+}
+
+// http://192.168.1.1/get_order
+void HandleGetOrder() {
+  if(!LoggedIn) {
+    Server.send(401, "text/html", "Unauthorized"); 
+    return;
+  }
+
+  JsonArray params = GlobalVariable["PARAM"];
+  String p1 = params[0];
+  String p2 = params[1];
+  String p3 = params[2];
+  String p4 = params[3];
+  String p5 = params[4];
+  String p6 = params[5];
+  String p7 = params[6];
+  String p8 = params[7];
+  String str = "[\"" + p1 + "\",\"" + p2 + "\",\"" + p3 + "\",\"" + p4 + "\",\"" + p5 + "\",\"" + p6 + "\",\"" + p7 + "\",\"" + p8 + "\"]";
+
+  Server.send(200, "application/json", str); 
 }
 
 // http://192.168.1.1/icon.png
@@ -588,15 +671,40 @@ void HandleSetSettings() {
 
   Server.send(200, "application/json", "{\"status\":\"UPDATED SUCCESSFULLY\"}");
 
-  String jsonString;
-  serializeJson(GlobalVariable, jsonString);
-  if(!WriteDataToEeprom(jsonString)) {
-    #if defined(DEBUG)
-    Serial.println("EEPROM Write Failed");
-    #endif
+  SyncDataAndSettings(true);
+  Show();
+}
+
+// http://192.168.1.1/set_order
+void HandleSetOrder() {
+  if(!LoggedIn) {
+    Server.send(401, "text/html", "Unauthorized"); 
+    return;
   }
 
-  IsValid = UpdatePointers();
+  if (!Server.hasArg("plain")) {
+    Server.send(400, "application/json", "{\"error\":\"Missing body\"}");
+    return;
+  }
+
+  Screen->clearScreen(true);
+
+  String body = Server.arg("plain");
+
+  JsonDocument json;
+  deserializeJson(json, body);
+
+  JsonArray params = json["PARAM"];
+  if(params[0] = "null") {
+    Server.send(400, "application/json", "{\"error\":\"Missing body\"}");
+    return;
+  }
+  
+  GlobalVariable["PARAM"] = json["PARAM"];
+
+  Server.send(200, "application/json", "{\"status\":\"UPDATED SUCCESSFULLY\"}");
+
+  SyncDataAndSettings(true);
   Show();
 }
 
@@ -614,11 +722,14 @@ void WebTask(void *pv) {
   Server.on("/get_price", HTTP_GET, HandleGetPrices);
   Server.on("/setting_login_page", HTTP_GET, HandleLoginPage);
   Server.on("/setting_page", HTTP_GET, HandleSettingPage);
+  Server.on("/reorder_parameters", HTTP_GET, HandleReorderParamPage);
   Server.on("/get_settings", HTTP_GET, HandleGetSettings);
+  Server.on("/get_order", HTTP_GET, HandleGetOrder);
   Server.on("/icon.png", HTTP_GET, HandleIconPng);
   Server.on("/set_price", HTTP_POST, HandleSetPrices);
   Server.on("/validate_auth", HTTP_POST, HandleValidateAuth);
   Server.on("/set_settings", HTTP_POST, HandleSetSettings);
+  Server.on("/set_order", HTTP_POST, HandleSetOrder);
   Server.begin();
 
   // Initialise delay
@@ -642,25 +753,20 @@ void WebTask(void *pv) {
           Screen->clearScreen(true);
 
           // Update Values
-          GlobalVariable["item1"] = json["item1"];
-          GlobalVariable["item2"] = json["item2"];
-          GlobalVariable["item3"] = json["item3"];
-          GlobalVariable["item4"] = json["item4"];
-          GlobalVariable["item5"] = json["item5"];
-          GlobalVariable["item6"] = json["item6"];
-          GlobalVariable["item7"] = json["item7"];
-          GlobalVariable["item8"] = json["item8"];
+          GlobalVariable["CNTS"] = json["CNTS"];
+          GlobalVariable["MSGID"] = json["MSGID"];
+          GlobalVariable["Petrol"] = json["Petrol"];
+          GlobalVariable["Diesel"] = json["Diesel"];
+          GlobalVariable["Power"] = json["Power"];
+          GlobalVariable["Auto_LPG"] = json["Auto_LPG"];
+          GlobalVariable["TurboJet"] = json["TurboJet"];
+          GlobalVariable["Power99"] = json["Power99"];
+          GlobalVariable["CNG"] = json["CNG"];
+          GlobalVariable["Power95"] = json["Power95"];
           GlobalVariable["MSG"] = json["MSG"];
+          GlobalVariable["PARAMS"] = json["PARAMS"];
 
-          // Save to EEPROM
-          serializeJson(GlobalVariable, rawJson);
-          if(!WriteDataToEeprom(rawJson)) {
-            #if defined(DEBUG)
-            Serial.println("EEPROM Write Failed");
-            #endif
-          }
-
-          IsValid = UpdatePointers();
+          SyncDataAndSettings(false);
           Show();
         }
       }
@@ -687,8 +793,10 @@ void WebTask(void *pv) {
             Screen->clearScreen(true);
             if(DisplaySize == DisplaySizes::DisplaySize1600mm) {
               Screen->drawMarquee(Message.c_str(), Message.length(), 159, 6);
-            } else {
+            } if(DisplaySize == DisplaySizes::DisplaySize960mm) {
               Screen->drawMarquee(Message.c_str(), Message.length(), 95, 6);
+            } else {
+              Screen->drawMarquee(Message.c_str(), Message.length(), 31, 6);
             }
           }
         }
@@ -719,8 +827,10 @@ void DmdTask(void *pv) {
   // Initialize Screen
   if(DisplaySize == DisplaySizes::DisplaySize1600mm) {
     Screen = new DMD(5, 2);
-  } else {
+  } if(DisplaySize == DisplaySizes::DisplaySize960mm) {
     Screen = new DMD(3, 2);
+  } else {
+    Screen = new DMD(2, 2);
   }
 
   // Clear the DMD pixels held in RAM
@@ -781,10 +891,12 @@ void setup(void) {
             now.hour(), now.minute(), now.second());
   #endif
   
+  #if !defined(DEFAULT_CONFIG)
   String jsonString;
   if(ReadDataFromEeprom(jsonString)) {
     deserializeJson(GlobalVariable, jsonString);
   } else {
+  #endif
     // Default
     #if defined(DEBUG)
     Serial.println("Default Values loaded");
@@ -792,20 +904,33 @@ void setup(void) {
 
     GlobalVariable["PDUID"] = "01";
     GlobalVariable["CNTS"] = "01";
-    GlobalVariable["item1"] = "000.00";
-    GlobalVariable["item2"] = "000.00";
-    GlobalVariable["item3"] = "000.00";
-    GlobalVariable["item4"] = "000.00";
-    GlobalVariable["item5"] = "000.00";
-    GlobalVariable["item6"] = "000.00";
-    GlobalVariable["item7"] = "000.00";
-    GlobalVariable["item8"] = "000.00";
+    GlobalVariable["MSGID"] = "01";
+    GlobalVariable["Petrol"] = "000.00";
+    GlobalVariable["Diesel"] = "000.00";
+    GlobalVariable["Power"] = "000.00";
+    GlobalVariable["Auto_LPG"] = "000.00";
+    GlobalVariable["TurboJet"] = "000.00";
+    GlobalVariable["Power99"] = "000.00";
+    GlobalVariable["CNG"] = "000.00";
+    GlobalVariable["Power95"] = "000.00";
     GlobalVariable["MSG"] = "";
     GlobalVariable["SSID"] = "RDUHisign";
     GlobalVariable["USER"] = "admin";
     GlobalVariable["PSWD"] = "admin@123";
     GlobalVariable["SIZE"] = "960mm";
+
+    JsonArray paramList = GlobalVariable.createNestedArray("PARAM");
+    paramList.add("Petrol");
+    paramList.add("Diesel");
+    paramList.add("Power");
+    paramList.add("Auto_LPG");
+    paramList.add("TurboJet");
+    paramList.add("Power99");
+    paramList.add("CNG");
+    paramList.add("Power95");
+  #if !defined(DEFAULT_CONFIG)
   }
+  #endif
   
   // Update pointers
   IsValid = UpdatePointers();
